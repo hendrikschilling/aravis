@@ -305,7 +305,7 @@ _process_data_block (ArvGvStreamThreadData *thread_data,
 		block_size = block_end - block_offset;
 	}
 
-	memcpy (((char *) frame->buffer->priv->data) + block_offset, &packet->data, block_size);
+	memcpy (((char *) frame->buffer->priv->data) + block_offset, ((char*)&packet->data)+12, block_size);
 
 	if (frame->packet_data[packet_id].time_us > 0) {
 		thread_data->n_resent_packets++;
@@ -652,6 +652,9 @@ _process_packet (ArvGvStreamThreadData *thread_data, const ArvGvspPacket *packet
 
 	frame_id = arv_gvsp_packet_get_frame_id (packet);
 	packet_id = arv_gvsp_packet_get_packet_id (packet);
+	//TODO automatically use this in the right moment?!
+	frame_id  = g_htonl(*(int32_t*)(((char*)packet)+12));
+	packet_id = g_htonl(*(int32_t*)(((char*)packet)+16));
 
 	if (thread_data->first_packet) {
 		thread_data->last_frame_id = frame_id - 1;
@@ -690,8 +693,11 @@ _process_packet (ArvGvStreamThreadData *thread_data, const ArvGvspPacket *packet
 			frame->last_valid_packet = i - 1;
 
 			arv_gvsp_packet_debug (packet, packet_size, ARV_DEBUG_LEVEL_LOG);
+			
+			ArvGvspContentType content_type = arv_gvsp_packet_get_content_type (packet);
+			content_type -= 128;
 
-			switch (arv_gvsp_packet_get_content_type (packet)) {
+			switch (content_type) {
 				case ARV_GVSP_CONTENT_TYPE_DATA_LEADER:
 					_process_data_leader (thread_data, frame, packet, packet_id);
 					break;
@@ -1055,7 +1061,7 @@ arv_gv_stream_new (ArvGvDevice *gv_device,
 	thread_data->packet_timeout_us = ARV_GV_STREAM_PACKET_TIMEOUT_US_DEFAULT;
 	thread_data->frame_retention_us = ARV_GV_STREAM_FRAME_RETENTION_US_DEFAULT;
 	thread_data->timestamp_tick_frequency = timestamp_tick_frequency;
-	thread_data->data_size = packet_size - ARV_GVSP_PACKET_PROTOCOL_OVERHEAD;
+	thread_data->data_size = packet_size - ARV_GVSP_PACKET_PROTOCOL_OVERHEAD - 12;
 	thread_data->use_packet_socket = (options & ARV_GV_STREAM_OPTION_PACKET_SOCKET_DISABLED) == 0;
 	thread_data->cancel = FALSE;
 
