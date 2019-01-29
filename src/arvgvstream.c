@@ -240,7 +240,7 @@ _process_data_leader (ArvGvStreamThreadData *thread_data,
 	}
 
 	frame->buffer->priv->payload_type = arv_gvsp_packet_get_buffer_payload_type (packet);
-	frame->buffer->priv->frame_id = arv_gvsp_packet_get_frame_id (packet);
+	frame->buffer->priv->frame_id = g_htonl(*(int32_t*)(((char*)packet)+12));
 	frame->buffer->priv->chunk_endianness = G_BIG_ENDIAN;
 
 	frame->buffer->priv->system_timestamp_ns = g_get_real_time() * 1000LL;
@@ -290,7 +290,7 @@ _process_data_block (ArvGvStreamThreadData *thread_data,
 		return;
 	}
 
-	block_size = arv_gvsp_packet_get_data_size (read_count);
+	block_size = arv_gvsp_packet_get_data_size (read_count)-12;
 	block_offset = (packet_id - 1) * thread_data->data_size;
 	block_end = block_size + block_offset;
 
@@ -650,8 +650,8 @@ _process_packet (ArvGvStreamThreadData *thread_data, const ArvGvspPacket *packet
 
 	thread_data->n_received_packets++;
 
-	frame_id = arv_gvsp_packet_get_frame_id (packet);
-	packet_id = arv_gvsp_packet_get_packet_id (packet);
+// 	frame_id = arv_gvsp_packet_get_frame_id (packet);
+// 	packet_id = arv_gvsp_packet_get_packet_id (packet);
 	//TODO automatically use this in the right moment?!
 	frame_id  = g_htonl(*(int32_t*)(((char*)packet)+12));
 	packet_id = g_htonl(*(int32_t*)(((char*)packet)+16));
@@ -693,11 +693,8 @@ _process_packet (ArvGvStreamThreadData *thread_data, const ArvGvspPacket *packet
 			frame->last_valid_packet = i - 1;
 
 			arv_gvsp_packet_debug (packet, packet_size, ARV_DEBUG_LEVEL_LOG);
-			
-			ArvGvspContentType content_type = arv_gvsp_packet_get_content_type (packet);
-			content_type -= 128;
 
-			switch (content_type) {
+			switch (arv_gvsp_packet_get_content_type (packet)) {
 				case ARV_GVSP_CONTENT_TYPE_DATA_LEADER:
 					_process_data_leader (thread_data, frame, packet, packet_id);
 					break;
@@ -1036,7 +1033,7 @@ arv_gv_stream_new (ArvGvDevice *gv_device,
 	options = arv_gv_device_get_stream_options (gv_device);
 
 	packet_size = arv_gv_device_get_packet_size (gv_device);
-	if (packet_size <= ARV_GVSP_PACKET_PROTOCOL_OVERHEAD) {
+	if (packet_size <= ARV_GVSP_PACKET_PROTOCOL_OVERHEAD) { //FIXME what is correct ARV_GVSP_PACKET_PROTOCOL_OVERHEAD
 		arv_gv_device_set_packet_size (gv_device, ARV_GV_DEVICE_GVSP_PACKET_SIZE_DEFAULT);
 		arv_debug_device ("[GvStream::stream_new] Packet size set to default value (%d)",
 				  ARV_GV_DEVICE_GVSP_PACKET_SIZE_DEFAULT);
@@ -1045,6 +1042,7 @@ arv_gv_stream_new (ArvGvDevice *gv_device,
 	packet_size = arv_gv_device_get_packet_size (gv_device);
 	arv_debug_device ("[GvStream::stream_new] Packet size = %d byte(s)", packet_size);
 
+        //FIXME what is correct ARV_GVSP_PACKET_PROTOCOL_OVERHEAD
 	g_return_val_if_fail (packet_size > ARV_GVSP_PACKET_PROTOCOL_OVERHEAD, NULL);
 
 	gv_stream = g_object_new (ARV_TYPE_GV_STREAM, NULL);
