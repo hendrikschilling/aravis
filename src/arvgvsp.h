@@ -185,8 +185,8 @@ arv_gvsp_packet_get_packet_type (const ArvGvspPacket *packet)
 static inline ArvGvspContentType
 arv_gvsp_packet_get_content_type (const ArvGvspPacket *packet)
 {
-	return ((ArvGvspContentType) ((g_ntohl (packet->header.packet_infos) & ARV_GVSP_PACKET_INFOS_CONTENT_TYPE_MASK) >>
-		ARV_GVSP_PACKET_INFOS_CONTENT_TYPE_POS)) - 128;
+	return ((ArvGvspContentType) (((g_ntohl (packet->header.packet_infos) & ARV_GVSP_PACKET_INFOS_CONTENT_TYPE_MASK) >>
+		ARV_GVSP_PACKET_INFOS_CONTENT_TYPE_POS) - 128));
 }
 
 static inline guint16
