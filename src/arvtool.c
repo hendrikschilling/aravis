@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 static void
-arv_tool_list_features (ArvGc *genicam, const char *feature, gboolean show_description, int level)
+arv_tool_list_features (ArvGc *genicam, const char *feature, gboolean show_description, int level, gboolean show_values)
 {
 	ArvGcNode *node;
 
@@ -28,6 +28,11 @@ arv_tool_list_features (ArvGc *genicam, const char *feature, gboolean show_descr
 			if (description)
 				printf ("%s\n", description);
 		}
+		if (show_values) {
+			const char *value = arv_gc_feature_node_get_value_as_string(ARV_GC_FEATURE_NODE (node), NULL);
+			if (value)
+				printf ("= %s\n", value);
+		}
 
 		if (ARV_IS_GC_CATEGORY (node)) {
 			const GSList *features;
@@ -36,7 +41,7 @@ arv_tool_list_features (ArvGc *genicam, const char *feature, gboolean show_descr
 			features = arv_gc_category_get_features (ARV_GC_CATEGORY (node));
 
 			for (iter = features; iter != NULL; iter = iter->next)
-				arv_tool_list_features (genicam, iter->data, show_description, level + 1);
+				arv_tool_list_features (genicam, iter->data, show_description, level + 1, show_values);
 		} else if (ARV_IS_GC_ENUMERATION (node)) {
 			const GSList *childs;
 			const GSList *iter;
@@ -76,10 +81,12 @@ arv_tool_execute_command (int argc, char **argv, ArvDevice *device)
 		if (xml != NULL)
 			printf ("%*s\n", (int) size, xml);
 	} else if (g_strcmp0 (command, "features") == 0) {
-		arv_tool_list_features (genicam, "Root", FALSE, 0);
+		arv_tool_list_features (genicam, "Root", FALSE, 0, FALSE);
+	} else if (g_strcmp0 (command, "values") == 0) {
+		arv_tool_list_features (genicam, "Root", FALSE, 0, TRUE);
 	} else if (g_strcmp0 (command, "description") == 0) {
 		if (argc < 3)
-			arv_tool_list_features (genicam, "Root", TRUE, 0);
+			arv_tool_list_features (genicam, "Root", TRUE, 0, FALSE);
 		else {
 			int i;
 
