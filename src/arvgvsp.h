@@ -122,9 +122,22 @@ typedef struct {
  * GVSP data leader packet data area.
  */
 
+// typedef struct {
+// 	guint16 flags;
+// 	guint16 payload_type;
+// 	guint32 timestamp_high;
+// 	guint32 timestamp_low;
+// 	guint32 pixel_format;
+// 	guint32 width;
+// 	guint32 height;
+// 	guint32	x_offset;
+// 	guint32	y_offset;
+// } ArvGvspDataLeader;
 typedef struct {
-	guint16 flags;
-	guint16 payload_type;
+	guint64 extended_id; //what is this actually?
+	guint32 packet_id;
+	guint16 flags; //sure?
+        guint16 payload_type;
 	guint32 timestamp_high;
 	guint32 timestamp_low;
 	guint32 pixel_format;
@@ -132,6 +145,8 @@ typedef struct {
 	guint32 height;
 	guint32	x_offset;
 	guint32	y_offset;
+	guint32	x_pad;
+	guint32	y_pad;
 } ArvGvspDataLeader;
 
 /**
