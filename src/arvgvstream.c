@@ -94,6 +94,7 @@ typedef struct {
 	guint32 frame_id;
 
 	gint32 last_valid_packet;
+	gint32 extended_id_enabled;
 	guint64 first_packet_time_us;
 	guint64 last_packet_time_us;
 
@@ -124,7 +125,9 @@ struct _ArvGvStreamThreadData {
 	guint frame_retention_us;
 
 	guint64 timestamp_tick_frequency;
-	guint data_size;
+	//FIXME remove date_size - we now use raw packet size, calculating data_size depending on ext. id status
+// 	guint data_size;
+	guint packet_size;
 
 	gboolean cancel;
 
@@ -163,12 +166,22 @@ struct _ArvGvStreamThreadData {
 	int current_socket_buffer_size;
 };
 
+size_t stream_thread_data_size(ArvGvStreamThreadData *thread_data, const ArvGvspPacket *packet)
+{
+	if (arv_gvsp_packet_extended_ids(packet))
+		return thread_data->packet_size - ARV_GVSP_PACKET_PROTOCOL_OVERHEAD - 12; 
+	else
+		return thread_data->packet_size - ARV_GVSP_PACKET_PROTOCOL_OVERHEAD; 
+	 
+}
+
 //TODO frame id should be 64bit
 static void
 _send_packet_request (ArvGvStreamThreadData *thread_data,
 		      guint32 frame_id,
 		      guint32 first_block,
-		      guint32 last_block)
+		      guint32 last_block,
+		      guint32 extended_id)
 {
 	ArvGvcpPacket *packet;
 	size_t packet_size;
@@ -176,7 +189,7 @@ _send_packet_request (ArvGvStreamThreadData *thread_data,
 	thread_data->packet_id = arv_gvcp_next_packet_id (thread_data->packet_id);
 
 	packet = arv_gvcp_packet_new_packet_resend_cmd (frame_id, first_block, last_block,
-							thread_data->packet_id, &packet_size);
+							thread_data->packet_id, &packet_size, extended_id);
 
 	arv_log_stream_thread ("[GvStream::send_packet_request] frame_id = %u (%d - %d)",
 			       frame_id, first_block, last_block);
@@ -300,7 +313,7 @@ _process_data_block (ArvGvStreamThreadData *thread_data,
 	else
 		block_size = arv_gvsp_packet_get_data_size (read_count);
 	//FIXME adapt data size for extended ids?
-	block_offset = (packet_id - 1) * thread_data->data_size;
+	block_offset = (packet_id - 1) * stream_thread_data_size(thread_data, packet);
 	block_end = block_size + block_offset;
 
 	if (block_end > frame->buffer->priv->size) {
@@ -360,11 +373,20 @@ _find_frame_data (ArvGvStreamThreadData *thread_data,
 	GSList *iter;
 	guint n_packets = 0;
 	gint16 frame_id_inc;
+	
+	int extended_id_enabled = arv_gvsp_packet_extended_ids(packet);
 
 	for (iter = thread_data->frames; iter != NULL; iter = iter->next) {
 		frame = iter->data;
 		if (frame->frame_id == frame_id) {
 			frame->last_packet_time_us = time_us;
+			
+			//FIXME graceful handling? how is such stuff done in aravis?
+			//TODO with this check all package handling functions can use the 
+			//frame's extended_id_enabled flag instead of checking individual package headers!
+			if (frame->extended_id_enabled != extended_id_enabled)
+				abort();
+			
 			return frame;
 		}
 	}
@@ -390,13 +412,16 @@ _find_frame_data (ArvGvStreamThreadData *thread_data,
 
 	frame->error_packet_received = FALSE;
 
+	frame->extended_id_enabled = extended_id_enabled;
 	frame->frame_id = frame_id;
 	frame->last_valid_packet = -1;
 
 	frame->buffer = buffer;
 	_update_socket (thread_data, frame->buffer);
 	frame->buffer->priv->status = ARV_BUFFER_STATUS_FILLING;
-	n_packets = (frame->buffer->priv->size + thread_data->data_size - 1) / thread_data->data_size + 2;
+	//FIXME needs to be set according to extended id statsu (see packet!)
+	guint32 data_size = stream_thread_data_size(thread_data, packet);
+	n_packets = (frame->buffer->priv->size + data_size - 1) / data_size + 2;
 
 	frame->first_packet_time_us = time_us;
 	frame->last_packet_time_us = time_us;
@@ -473,7 +498,8 @@ _missing_packet_check (ArvGvStreamThreadData *thread_data,
 							       packet_id, frame->n_packets);
 
 					_send_packet_request (thread_data, frame->frame_id,
-							      first_missing, i - 1);
+							      first_missing, i - 1,
+							      frame->extended_id_enabled);
 					for (j = first_missing; j < i; j++)
 						frame->packet_data[j].time_us = time_us;
 					thread_data->n_resend_requests += (i - first_missing);
@@ -505,7 +531,8 @@ _missing_packet_check (ArvGvStreamThreadData *thread_data,
 					       packet_id, frame->n_packets);
 
 			_send_packet_request (thread_data, frame->frame_id,
-					      first_missing, i - 1);
+					      first_missing, i - 1,
+					      frame->extended_id_enabled);
 			for (j = first_missing; j < i; j++)
 				frame->packet_data[j].time_us = time_us;
 			thread_data->n_resend_requests += (i - first_missing);
@@ -1076,7 +1103,9 @@ arv_gv_stream_new (ArvGvDevice *gv_device,
 	thread_data->frame_retention_us = ARV_GV_STREAM_FRAME_RETENTION_US_DEFAULT;
 	thread_data->timestamp_tick_frequency = timestamp_tick_frequency;
 	//FIXME need to data_size when receiving? beforehand extended id feature is not known?
-	thread_data->data_size = packet_size - ARV_GVSP_PACKET_PROTOCOL_OVERHEAD - 12;
+	//is now rolled out into stream_thread_data_size
+	thread_data->packet_size = packet_size;
+// 	thread_data->data_size = packet_size - ARV_GVSP_PACKET_PROTOCOL_OVERHEAD - 12;
 	thread_data->use_packet_socket = (options & ARV_GV_STREAM_OPTION_PACKET_SOCKET_DISABLED) == 0;
 	thread_data->cancel = FALSE;
 

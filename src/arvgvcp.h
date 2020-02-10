@@ -269,7 +269,8 @@ ArvGvcpPacket * 	arv_gvcp_packet_new_discovery_cmd 	(size_t *size);
 ArvGvcpPacket * 	arv_gvcp_packet_new_discovery_ack 	(size_t *packet_size);
 ArvGvcpPacket * 	arv_gvcp_packet_new_packet_resend_cmd 	(guint32 frame_id,
 								 guint32 first_block, guint32 last_block,
-								 guint16 packet_id, size_t *packet_size);
+								 guint16 packet_id, size_t *packet_size, 
+								 guint32 extended_id_flag);
 char * 			arv_gvcp_packet_to_string 		(const ArvGvcpPacket *packet);
 void 			arv_gvcp_packet_debug 			(const ArvGvcpPacket *packet, ArvDebugLevel level);
 

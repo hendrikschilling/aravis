@@ -378,34 +378,53 @@ arv_gvcp_packet_new_discovery_ack (size_t *packet_size)
  *
  * Return value: (transfer full): a new #ArvGvcpPacket
  */
-//TODO frame_id should be 64bit
+//FIXME frame_id should be 64bit
 ArvGvcpPacket *
 arv_gvcp_packet_new_packet_resend_cmd (guint32 frame_id,
 				       guint32 first_block, guint32 last_block,
-				       guint16 packet_id, size_t *packet_size)
+				       guint16 packet_id, size_t *packet_size, 
+				       guint32 extended_id_flag)
 {
 	ArvGvcpPacket *packet;
 	guint32 *data;
 
 	g_return_val_if_fail (packet_size != NULL, NULL);
 
-// 	*packet_size = sizeof (ArvGvcpHeader) + 3 * sizeof (guint32);
-	*packet_size = sizeof (ArvGvcpHeader) + 5 * sizeof (guint32);
+	if (extended_id_flag) {
+	// 	*packet_size = sizeof (ArvGvcpHeader) + 3 * sizeof (guint32);
+		*packet_size = sizeof (ArvGvcpHeader) + 5 * sizeof (guint32);
 
-	packet = g_malloc (*packet_size);
+		packet = g_malloc (*packet_size);
 
-	packet->header.packet_type = g_htons (ARV_GVCP_PACKET_TYPE_RESEND) | 0x1000; //extended_id_flag
-	packet->header.command = g_htons (ARV_GVCP_COMMAND_PACKET_RESEND_CMD);
-	packet->header.size = g_htons (3 * sizeof (guint32));
-	packet->header.id = g_htons (packet_id);
+		packet->header.packet_type = g_htons (ARV_GVCP_PACKET_TYPE_RESEND) | 0x1000; //extended_id_flag
+		packet->header.command = g_htons (ARV_GVCP_COMMAND_PACKET_RESEND_CMD);
+		packet->header.size = g_htons (3 * sizeof (guint32));
+		packet->header.id = g_htons (packet_id);
 
-	data = (guint32 *) &packet->data;
+		data = (guint32 *) &packet->data;
 
-	data[0] = g_htonl (0);
-	data[1] = g_htonl (first_block);
-	data[2] = g_htonl (last_block);
-	data[3] = g_htonl (0); //TODO high part
-	data[4] = g_htonl (frame_id);
+		data[0] = g_htonl (0);
+		data[1] = g_htonl (first_block);
+		data[2] = g_htonl (last_block);
+		data[3] = g_htonl (0); //FIXME high part? what where?
+		data[4] = g_htonl (frame_id);
+	}
+	else {
+		*packet_size = sizeof (ArvGvcpHeader) + 3 * sizeof (guint32);
+
+		packet = g_malloc (*packet_size);
+
+		packet->header.packet_type = g_htons (ARV_GVCP_PACKET_TYPE_RESEND);
+		packet->header.command = g_htons (ARV_GVCP_COMMAND_PACKET_RESEND_CMD);
+		packet->header.size = g_htons (3 * sizeof (guint32));
+		packet->header.id = g_htons (packet_id);
+
+		data = (guint32 *) &packet->data;
+
+		data[0] = g_htonl (frame_id);
+		data[1] = g_htonl (first_block);
+		data[2] = g_htonl (last_block);
+	}
 
 	return packet;
 }
