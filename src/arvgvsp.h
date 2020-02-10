@@ -198,6 +198,16 @@ arv_gvsp_packet_get_packet_type (const ArvGvspPacket *packet)
 	return (ArvGvspPacketType) g_ntohs (packet->header.packet_type);
 }
 
+//FIXME not used cause I don't understand where the data leader is left...
+// guint8 *
+// arv_gvsp_packet_get_data (const ArvGvspPacket *packet)
+// {
+// 	if (arv_gvsp_packet_extended_ids(packet))
+// 		return &((ArvGvspExtPacket*)packet)->data
+// 	else
+// 		return &packet->data;
+// }
+
 //FIXME nicer typing
 static inline int arv_gvsp_packet_extended_ids(const ArvGvspPacket *packet)
 {

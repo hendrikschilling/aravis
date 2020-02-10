@@ -295,6 +295,7 @@ _process_data_block (ArvGvStreamThreadData *thread_data,
 	}
 
 	if (arv_gvsp_packet_extended_ids(packet))
+		//FIXME shouldn't block size be read_count - header - leader size?! but arv_gvsp_packet_get_data_size only does -header?!
 		block_size = arv_gvsp_packet_get_data_size (read_count)-12;
 	else
 		block_size = arv_gvsp_packet_get_data_size (read_count);
@@ -315,6 +316,7 @@ _process_data_block (ArvGvStreamThreadData *thread_data,
 	if (arv_gvsp_packet_extended_ids(packet))
 		memcpy (((char *) frame->buffer->priv->data) + block_offset, ((char*)&packet->data)+12, block_size);
 	else
+		//FIXME packet->data includes the leader?!
 		memcpy (((char *) frame->buffer->priv->data) + block_offset, &packet->data, block_size);
 
 	if (frame->packet_data[packet_id].time_us > 0) {

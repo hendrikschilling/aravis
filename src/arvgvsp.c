@@ -156,6 +156,7 @@ arv_gvsp_content_type_to_string (ArvGvspContentType value)
 	return arv_enum_to_string (ARV_TYPE_GVSP_CONTENT_TYPE, value);
 }
 
+//FIXME implement ext blockid type support
 char *
 arv_gvsp_packet_to_string (const ArvGvspPacket *packet, size_t packet_size)
 {
@@ -213,6 +214,7 @@ arv_gvsp_packet_to_string (const ArvGvspPacket *packet, size_t packet_size)
 	return c_string;
 }
 
+//FIXME implement extende pkg id support
 void
 arv_gvsp_packet_debug (const ArvGvspPacket *packet, size_t packet_size, ArvDebugLevel level)
 {
