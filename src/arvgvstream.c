@@ -241,7 +241,10 @@ _process_data_leader (ArvGvStreamThreadData *thread_data,
 	}
 
 	frame->buffer->priv->payload_type = arv_gvsp_packet_get_buffer_payload_type (packet);
-	frame->buffer->priv->frame_id = g_htonl(*(int32_t*)(((char*)packet)+12));
+	if (arv_gvsp_packet_extended_ids(packet))
+		frame->buffer->priv->frame_id = g_htonl(*(int32_t*)(((char*)packet)+12));
+	else
+		frame->buffer->priv->frame_id = arv_gvsp_packet_get_frame_id(packet);
 	frame->buffer->priv->chunk_endianness = G_BIG_ENDIAN;
 
 	frame->buffer->priv->system_timestamp_ns = g_get_real_time() * 1000LL;
@@ -291,7 +294,11 @@ _process_data_block (ArvGvStreamThreadData *thread_data,
 		return;
 	}
 
-	block_size = arv_gvsp_packet_get_data_size (read_count)-12;
+	if (arv_gvsp_packet_extended_ids(packet))
+		block_size = arv_gvsp_packet_get_data_size (read_count)-12;
+	else
+		block_size = arv_gvsp_packet_get_data_size (read_count);
+	//FIXME adapt data size for extended ids?
 	block_offset = (packet_id - 1) * thread_data->data_size;
 	block_end = block_size + block_offset;
 
@@ -305,8 +312,10 @@ _process_data_block (ArvGvStreamThreadData *thread_data,
 		block_end = frame->buffer->priv->size;
 		block_size = block_end - block_offset;
 	}
-
-	memcpy (((char *) frame->buffer->priv->data) + block_offset, ((char*)&packet->data)+12, block_size);
+	if (arv_gvsp_packet_extended_ids(packet))
+		memcpy (((char *) frame->buffer->priv->data) + block_offset, ((char*)&packet->data)+12, block_size);
+	else
+		memcpy (((char *) frame->buffer->priv->data) + block_offset, &packet->data, block_size);
 
 	if (frame->packet_data[packet_id].time_us > 0) {
 		thread_data->n_resent_packets++;
@@ -651,11 +660,15 @@ _process_packet (ArvGvStreamThreadData *thread_data, const ArvGvspPacket *packet
 
 	thread_data->n_received_packets++;
 
-// 	frame_id = arv_gvsp_packet_get_frame_id (packet);
-// 	packet_id = arv_gvsp_packet_get_packet_id (packet);
-	//TODO automatically use this in the right moment?!
-	frame_id  = g_htonl(*(int32_t*)(((char*)packet)+12));
-	packet_id = g_htonl(*(int32_t*)(((char*)packet)+16));
+	if (arv_gvsp_packet_extended_ids(packet)) {
+		//FIXME fix get_... functions to work with extended ids
+		frame_id  = g_htonl(*(int32_t*)(((char*)packet)+12));
+		packet_id = g_htonl(*(int32_t*)(((char*)packet)+16));
+	}
+	else {
+		frame_id = arv_gvsp_packet_get_frame_id (packet);
+		packet_id = arv_gvsp_packet_get_packet_id (packet);
+	}
 
 	if (thread_data->first_packet) {
 		thread_data->last_frame_id = frame_id - 1;
@@ -1034,7 +1047,7 @@ arv_gv_stream_new (ArvGvDevice *gv_device,
 	options = arv_gv_device_get_stream_options (gv_device);
 
 	packet_size = arv_gv_device_get_packet_size (gv_device);
-	if (packet_size <= ARV_GVSP_PACKET_PROTOCOL_OVERHEAD) { //FIXME what is correct ARV_GVSP_PACKET_PROTOCOL_OVERHEAD
+	if (packet_size <= ARV_GVSP_PACKET_PROTOCOL_OVERHEAD) { //FIXME what is correct ARV_GVSP_PACKET_PROTOCOL_OVERHEAD with extended ids?
 		arv_gv_device_set_packet_size (gv_device, ARV_GV_DEVICE_GVSP_PACKET_SIZE_DEFAULT);
 		arv_debug_device ("[GvStream::stream_new] Packet size set to default value (%d)",
 				  ARV_GV_DEVICE_GVSP_PACKET_SIZE_DEFAULT);
@@ -1043,7 +1056,7 @@ arv_gv_stream_new (ArvGvDevice *gv_device,
 	packet_size = arv_gv_device_get_packet_size (gv_device);
 	arv_debug_device ("[GvStream::stream_new] Packet size = %d byte(s)", packet_size);
 
-        //FIXME what is correct ARV_GVSP_PACKET_PROTOCOL_OVERHEAD
+        //FIXME what is correct ARV_GVSP_PACKET_PROTOCOL_OVERHEAD with extended ids?
 	g_return_val_if_fail (packet_size > ARV_GVSP_PACKET_PROTOCOL_OVERHEAD, NULL);
 
 	gv_stream = g_object_new (ARV_TYPE_GV_STREAM, NULL);
@@ -1060,6 +1073,7 @@ arv_gv_stream_new (ArvGvDevice *gv_device,
 	thread_data->packet_timeout_us = ARV_GV_STREAM_PACKET_TIMEOUT_US_DEFAULT;
 	thread_data->frame_retention_us = ARV_GV_STREAM_FRAME_RETENTION_US_DEFAULT;
 	thread_data->timestamp_tick_frequency = timestamp_tick_frequency;
+	//FIXME need to data_size when receiving? beforehand extended id feature is not known?
 	thread_data->data_size = packet_size - ARV_GVSP_PACKET_PROTOCOL_OVERHEAD - 12;
 	thread_data->use_packet_socket = (options & ARV_GV_STREAM_OPTION_PACKET_SOCKET_DISABLED) == 0;
 	thread_data->cancel = FALSE;
